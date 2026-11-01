@@ -2,6 +2,14 @@
 
 Destroy falling Tetris-inspired enemies, survive increasingly difficult stages, and progress through dynamically themed environments with procedurally generated backgrounds and adaptive music.
 
+![Screenshot](Tetrovious.png)
+
+## Play Online
+ 
+🎮 **Play Tetrovious in your browser**
+ 
+[https://olaelias.github.io/Tetrovious/](https://olaelias.github.io/Tetrovious/)
+
 ## Features
 
 - Pure HTML, CSS, and JavaScript
