@@ -1,6 +1,6 @@
 # Tetrovious
 
-Destroy falling Tetris-inspired enemies, survive increasingly difficult stages, and progress through dynamically themed environments with procedurally generated backgrounds and adaptive music.
+Destroy Tetris block-inspired enemies, survive increasingly difficult stages, and progress through dynamically themed environments with procedurally generated backgrounds and adaptive music.
 
 ![Screenshot](Tetrovious.png)
 
@@ -33,4 +33,4 @@ Destroy falling Tetris-inspired enemies, survive increasingly difficult stages, 
 
 ## Running
 
-Open `Tetrovious7.html` in any modern web browser.
+Open `Tetrovious.html` in any modern web browser.
