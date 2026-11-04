@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<title>Tetrovious</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#05060d;--fg:#cfe;color-scheme:dark}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:monospace}
+body{display:flex;align-items:center;justify-content:center;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+canvas{background:#070a14;max-width:100%;max-height:100%;border:1px solid #234;image-rendering:pixelated}
+</style>
+</head>
+<body>
+<canvas id="c" width="480" height="640"></canvas>
+<script>
+const cv=document.getElementById('c'),g=cv.getContext('2d'),W=480,H=640,S=28;
+function fit(){const k=Math.min(innerWidth/W,innerHeight/H);cv.style.width=W*k+'px';cv.style.height=H*k+'px'}
+addEventListener('resize',fit);fit();
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=1;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
+ if(state!=='play'&&(e.code==='Enter'||e.code==='Space'))start();});
+addEventListener('keyup',e=>keys[e.code]=0);
+// touch: drag to move, auto-fire
+let touch=null;
+cv.addEventListener('touchstart',e=>{touch=pos(e);if(state!=='play')start();e.preventDefault()},{passive:false});
+cv.addEventListener('touchmove',e=>{const p=pos(e);if(touch){ship.x+=p.x-touch.x;ship.y+=p.y-touch.y}touch=p;e.preventDefault()},{passive:false});
+cv.addEventListener('touchend',()=>touch=null);
+function pos(e){const r=cv.getBoundingClientRect(),t=e.touches[0];return{x:(t.clientX-r.left)*W/r.width,y:(t.clientY-r.top)*H/r.height}}
+// sound
+let ac;function beep(f,d,t='square',v=.05){try{ac=ac||new AudioContext();const o=ac.createOscillator(),a=ac.createGain();o.type=t;o.frequency.value=f;a.gain.setValueAtTime(v,ac.currentTime);a.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(a);a.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
+const SHAPES={I:[[0,0],[1,0],[2,0],[3,0]],O:[[0,0],[1,0],[0,1],[1,1]],T:[[0,0],[1,0],[2,0],[1,1]],S:[[1,0],[2,0],[0,1],[1,1]],Z:[[0,0],[1,0],[1,1],[2,1]],J:[[0,0],[0,1],[1,1],[2,1]],L:[[2,0],[0,1],[1,1],[2,1]]};
+const COL={I:'#3cf',O:'#fd3',T:'#c5f',S:'#4e6',Z:'#f54',J:'#58f',L:'#f93'};
+let ship,bullets,pieces,parts,score,lives,t,spawn,cool,state='title',hi=0;
+function start(){ship={x:W/2,y:H-90,inv:0};bullets=[];pieces=[];parts=[];score=0;lives=3;t=0;spawn=1;cool=0;state='play'}
+function mkPiece(){
+ const k=Object.keys(SHAPES)[Math.random()*7|0];let c=SHAPES[k].map(a=>a.slice());
+ for(let r=Math.random()*4|0;r>0;r--)c=c.map(([x,y])=>[-y,x]);
+ const mx=Math.min(...c.map(a=>a[0])),my=Math.min(...c.map(a=>a[1]));
+ c=c.map(([x,y])=>({dx:x-mx,dy:y-my,hp:2}));
+ const w=Math.max(...c.map(a=>a.dx))+1,h=Math.max(...c.map(a=>a.dy))+1;
+ pieces.push({k,c,x:Math.random()*(W-w*S),y:-h*S,vy:50+Math.min(t*.8,100)+Math.random()*30,vx:(Math.random()-.5)*30,total:c.length});
+}
+function boom(x,y,col,n=8){for(let i=0;i<n;i++){const a=Math.random()*6.28,s=40+Math.random()*120;parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:.4+Math.random()*.3,col})}}
+function update(dt){
+ t+=dt;
+ const sp=280*(keys.ShiftLeft?.5:1);let dx=0,dy=0;
+ if(keys.ArrowLeft||keys.KeyA)dx--;if(keys.ArrowRight||keys.KeyD)dx++;
+ if(keys.ArrowUp||keys.KeyW)dy--;if(keys.ArrowDown||keys.KeyS)dy++;
+ if(dx&&dy){dx*=.707;dy*=.707}
+ ship.x+=dx*sp*dt;ship.y+=dy*sp*dt;
+ ship.x=Math.max(12,Math.min(W-12,ship.x));ship.y=Math.max(14,Math.min(H-14,ship.y));
+ ship.inv=Math.max(0,ship.inv-dt);
+ cool-=dt;
+ if((keys.Space||keys.KeyZ||touch)&&cool<=0){bullets.push({x:ship.x,y:ship.y-16});cool=.13;beep(880,.05,'square',.03)}
+ bullets.forEach(b=>b.y-=620*dt);bullets=bullets.filter(b=>b.y>-10);
+ spawn-=dt;if(spawn<=0){mkPiece();spawn=Math.max(.5,1.7-t*.01)}
+ for(const p of pieces){p.y+=p.vy*dt;p.x+=p.vx*dt;
+  const w=Math.max(...p.c.map(a=>a.dx))+1;if(p.x<0||p.x>W-w*S)p.vx*=-1;
+  for(const c of p.c){const cx=p.x+c.dx*S,cy=p.y+c.dy*S;
+   for(const b of bullets){if(!b.d&&b.x>cx&&b.x<cx+S&&b.y>cy&&b.y<cy+S){b.d=1;c.hp--;score+=10;
+     if(c.hp<=0){score+=40;boom(cx+S/2,cy+S/2,COL[p.k]);beep(200,.12,'sawtooth',.05)}else beep(440,.05,'triangle',.04)}}
+   if(c.hp>0&&ship.inv<=0){const nx=Math.max(cx,Math.min(ship.x,cx+S)),ny=Math.max(cy,Math.min(ship.y,cy+S));
+    if((nx-ship.x)**2+(ny-ship.y)**2<64){hit()}}}
+  const alive=p.c.length;p.c=p.c.filter(c=>c.hp>0);
+  if(!p.c.length&&alive)score+=p.total*10;
+ }
+ bullets=bullets.filter(b=>!b.d);
+ pieces=pieces.filter(p=>p.c.length&&p.y<H+4*S);
+ parts.forEach(q=>{q.x+=q.vx*dt;q.y+=q.vy*dt;q.l-=dt});parts=parts.filter(q=>q.l>0);
+}
+function hit(){lives--;ship.inv=2;boom(ship.x,ship.y,'#fff',20);beep(90,.4,'sawtooth',.08);
+ if(lives<=0){state='over';hi=Math.max(hi,score)}}
+function draw(){
+ g.fillStyle='#070a14';g.fillRect(0,0,W,H);
+ // scrolling ground grid (Xevious-like feel)
+ g.strokeStyle='#0e1a2c';g.lineWidth=1;const off=(performance.now()/1000*40)%64;
+ for(let y=-64+off;y<H;y+=64){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke()}
+ for(let x=0;x<W;x+=64){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke()}
+ if(state==='title'){text('TETROVIOUS',H/2-40,32);text('Pilar/WASD: flyg   Space/Z: skjut   Shift: sakta',H/2+4,13);text('Tryck Enter eller Space',H/2+34,16);return}
+ for(const p of pieces)for(const c of p.c){const x=p.x+c.dx*S,y=p.y+c.dy*S;
+  g.fillStyle=c.hp>1?COL[p.k]:'#556';g.fillRect(x+1,y+1,S-2,S-2);
+  g.strokeStyle='rgba(255,255,255,.5)';g.strokeRect(x+3.5,y+3.5,S-7,S-7)}
+ g.fillStyle='#fff';bullets.forEach(b=>g.fillRect(b.x-1.5,b.y-6,3,12));
+ parts.forEach(q=>{g.globalAlpha=Math.max(0,q.l*2);g.fillStyle=q.col;g.fillRect(q.x-2,q.y-2,4,4)});g.globalAlpha=1;
+ if(state==='play'&&(ship.inv<=0||Math.floor(ship.inv*10)%2)){
+  g.fillStyle='#eaf6ff';g.beginPath();g.moveTo(ship.x,ship.y-16);g.lineTo(ship.x+12,ship.y+12);g.lineTo(ship.x-12,ship.y+12);g.closePath();g.fill();
+  g.fillStyle='#f80';g.fillRect(ship.x-3,ship.y+12,6,3+Math.random()*5)}
+ g.fillStyle='#cfe';g.font='14px monospace';g.textAlign='left';g.fillText('SCORE '+score,10,20);
+ g.textAlign='right';g.fillText('LIVES '+lives+'  HI '+hi,W-10,20);
+ if(state==='over'){text('GAME OVER',H/2-10,32);text('Enter för att försöka igen',H/2+26,15)}
+}
+function text(s,y,sz){g.fillStyle='#cfe';g.font='bold '+sz+'px monospace';g.textAlign='center';g.fillText(s,W/2,y)}
+let last=performance.now();
+function loop(n){const dt=Math.min(.05,(n-last)/1000);last=n;if(state==='play')update(dt);else if(state==='over'){parts.forEach(q=>{q.x+=q.vx*dt;q.y+=q.vy*dt;q.l-=dt});parts=parts.filter(q=>q.l>0)}draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
